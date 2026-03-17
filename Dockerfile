@@ -2,12 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for image processing
+# Install system dependencies for image processing and git for updates
 RUN apt-get update && apt-get install -y \
     libopenjp2-7 \
     libtiff6 \
     libwebp7 \
     libjpeg62-turbo \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better layer caching
@@ -15,13 +16,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY main.py .
-COPY config.py .
-COPY database.py .
-COPY image_processor.py .
-COPY keyboards.py .
-COPY messages.py .
-COPY handlers.py .
+COPY . /app
 
 # Create necessary directories
 RUN mkdir -p user_data/logos user_data/settings user_data/temp
