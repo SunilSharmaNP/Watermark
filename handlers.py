@@ -247,8 +247,17 @@ async def handle_logo_upload(client: Client, message: Message, user_id: int):
         else:
             file = await client.download_media(message.document.file_id)
         
-        # Validate it's a PNG
-        if not file.lower().endswith('.png'):
+        # Validate it's a PNG by checking magic bytes and opening with PIL
+        try:
+            from PIL import Image
+            img = Image.open(file)
+            if img.format != 'PNG':
+                raise ValueError("Not a PNG image")
+            # Check for alpha channel (transparency)
+            if img.mode not in ('RGBA', 'PA', 'P'):
+                # Convert to RGBA if needed
+                img = img.convert('RGBA')
+        except Exception as e:
             await processing_msg.delete()
             await message.reply_text(
                 get_error_message("invalid_logo_format"),
@@ -259,10 +268,15 @@ async def handle_logo_upload(client: Client, message: Message, user_id: int):
                 os.remove(file)
             return
         
-        # Save as user logo
+        # Save as user logo with proper .png extension
         from config import LOGOS_PATH
         logo_path = os.path.join(LOGOS_PATH, f"{user_id}.png")
-        os.rename(file, logo_path)
+        
+        # If file doesn't have .png extension, rename it
+        if not file.lower().endswith('.png'):
+            os.rename(file, logo_path)
+        else:
+            os.rename(file, logo_path)
         
         # Update database
         UserDatabase.set_logo(user_id, logo_path)
