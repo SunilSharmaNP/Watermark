@@ -13,6 +13,14 @@ API_ID = int(os.getenv("API_ID", ""))
 API_HASH = os.getenv("API_HASH", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
+# Admin user ID for restricted commands
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0")) if os.getenv("ADMIN_ID") else None
+
+# Updater Configuration
+UPSTREAM_REPO = os.getenv("UPSTREAM_REPO", "").strip()
+UPSTREAM_BRANCH = os.getenv("UPSTREAM_BRANCH", "main").strip()
+UPDATE_PKGS = os.getenv("UPDATE_PKGS", "True").lower() == "true"
+
 # Storage settings
 STORAGE_PATH = "user_data"
 LOGOS_PATH = os.path.join(STORAGE_PATH, "logos")
