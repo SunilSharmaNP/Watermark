@@ -5,7 +5,7 @@ Main entry point and bot initialization
 
 import asyncio
 import logging
-from pyrogram import Client
+from pyrogram import Client, idle
 from config import API_ID, API_HASH, BOT_TOKEN
 from handlers import setup_handlers
 
@@ -31,9 +31,13 @@ async def main():
     
     logger.info("🤖 Starting Watermark Bot...")
     
-    async with app:
+    # Start the client, wait for events with `idle()`, then stop
+    await app.start()
+    try:
         logger.info("✅ Bot is running and listening for messages...")
-        await app.run()
+        await idle()
+    finally:
+        await app.stop()
 
 
 if __name__ == "__main__":
