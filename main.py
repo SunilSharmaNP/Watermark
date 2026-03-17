@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def main():
+kasync def main():
     """Initialize and run the bot"""
     app = Client(
         "watermark_bot",
