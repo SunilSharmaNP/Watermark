@@ -5,6 +5,7 @@ Main event handling logic
 
 import os
 from pyrogram import Client, filters
+from pyrogram.enums import ParseMode
 from pyrogram.types import Message, CallbackQuery, User
 from database import UserDatabase
 from keyboards import (
@@ -16,6 +17,8 @@ from keyboards import (
 )
 from messages import *
 from image_processor import ImageProcessor
+from updater import restart_bot
+from config import ADMIN_ID
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,7 +42,7 @@ def setup_handlers(app: Client):
         await message.reply_text(
             get_welcome_message(),
             reply_markup=get_main_menu_keyboard(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
     
     @app.on_message(filters.command("help"))
@@ -48,8 +51,51 @@ def setup_handlers(app: Client):
         await message.reply_text(
             get_help_message(),
             reply_markup=get_back_keyboard(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
+    
+    @app.on_message(filters.command("update"))
+    async def update_handler(client: Client, message: Message):
+        """Handle /update command (admin only)"""
+        user_id = message.from_user.id
+        
+        # Check if user is admin
+        if ADMIN_ID is None or user_id != ADMIN_ID:
+            await message.reply_text(
+                "❌ You do not have permission to use this command.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        # Show processing message
+        status_msg = await message.reply_text(
+            "⏳ **Checking for updates...**",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        try:
+            success, msg = await restart_bot()
+            
+            if success:
+                await status_msg.edit_text(
+                    f"✅ **Update Successful**\n\n{msg}\n\n"
+                    "_The bot will need to be restarted to apply changes._",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.info(f"Bot update successful: {msg}")
+            else:
+                await status_msg.edit_text(
+                    f"❌ **Update Failed**\n\n{msg}",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.error(f"Bot update failed: {msg}")
+        
+        except Exception as e:
+            logger.error(f"Error during update: {e}")
+            await status_msg.edit_text(
+                f"❌ **Update Error**\n\nAn error occurred: {str(e)}",
+                parse_mode=ParseMode.MARKDOWN
+            )
     
     @app.on_callback_query()
     async def callback_handler(client: Client, callback_query: CallbackQuery):
@@ -66,21 +112,21 @@ def setup_handlers(app: Client):
                 await callback_query.edit_message_text(
                     get_set_logo_message(),
                     reply_markup=get_back_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
             
             elif data == "set_position":
                 await callback_query.edit_message_text(
                     get_set_position_message(),
                     reply_markup=get_position_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
             
             elif data == "set_size":
                 await callback_query.edit_message_text(
                     get_set_size_message(),
                     reply_markup=get_size_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
             
             elif data == "my_settings":
@@ -96,14 +142,14 @@ def setup_handlers(app: Client):
                         position_name
                     ),
                     reply_markup=get_main_menu_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
             
             elif data == "help":
                 await callback_query.edit_message_text(
                     get_help_message(),
                     reply_markup=get_back_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
             
             # Position Selection
@@ -115,7 +161,7 @@ def setup_handlers(app: Client):
                 await callback_query.edit_message_text(
                     get_position_saved_message(position_name),
                     reply_markup=get_main_menu_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
                 logger.info(f"User {user_id} set position to {position}")
             
@@ -127,7 +173,7 @@ def setup_handlers(app: Client):
                 await callback_query.edit_message_text(
                     get_size_saved_message(size),
                     reply_markup=get_main_menu_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
                 logger.info(f"User {user_id} set size to {size}%")
             
@@ -137,7 +183,7 @@ def setup_handlers(app: Client):
                 await callback_query.edit_message_text(
                     get_welcome_message(),
                     reply_markup=get_main_menu_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
         
         except Exception as e:
@@ -145,7 +191,7 @@ def setup_handlers(app: Client):
             await callback_query.edit_message_text(
                 get_error_message("general"),
                 reply_markup=get_main_menu_keyboard(),
-                parse_mode="markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
     
     @app.on_message(filters.photo | filters.document)
@@ -166,7 +212,7 @@ def setup_handlers(app: Client):
                 await message.reply_text(
                     get_invalid_input_message(),
                     reply_markup=get_main_menu_keyboard(),
-                    parse_mode="markdown"
+                    parse_mode=ParseMode.MARKDOWN
                 )
         
         except Exception as e:
@@ -174,16 +220,16 @@ def setup_handlers(app: Client):
             await message.reply_text(
                 get_error_message("general"),
                 reply_markup=get_main_menu_keyboard(),
-                parse_mode="markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
     
-    @app.on_message(filters.text & ~filters.command)
+    @app.on_message(filters.text & filters.private & ~filters.regex(r'^/'))
     async def text_handler(client: Client, message: Message):
         """Handle text messages"""
         await message.reply_text(
             get_invalid_input_message(),
             reply_markup=get_main_menu_keyboard(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
 
 
@@ -192,7 +238,7 @@ async def handle_logo_upload(client: Client, message: Message, user_id: int):
     try:
         processing_msg = await message.reply_text(
             get_processing_message(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
         
         # Get logo file
@@ -207,7 +253,7 @@ async def handle_logo_upload(client: Client, message: Message, user_id: int):
             await message.reply_text(
                 get_error_message("invalid_logo_format"),
                 reply_markup=get_back_keyboard(),
-                parse_mode="markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
             if os.path.exists(file):
                 os.remove(file)
@@ -227,7 +273,7 @@ async def handle_logo_upload(client: Client, message: Message, user_id: int):
         await message.reply_text(
             get_logo_saved_message(),
             reply_markup=get_main_menu_keyboard(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
         
         logger.info(f"Logo uploaded successfully for user {user_id}")
@@ -237,7 +283,7 @@ async def handle_logo_upload(client: Client, message: Message, user_id: int):
         await message.reply_text(
             get_error_message("general"),
             reply_markup=get_back_keyboard(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
 
 
@@ -249,14 +295,14 @@ async def handle_thumbnail_watermarking(client: Client, message: Message, user_i
             await message.reply_text(
                 get_error_message("no_logo"),
                 reply_markup=get_main_menu_keyboard(),
-                parse_mode="markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
             return
         
         # Show processing message
         processing_msg = await message.reply_text(
             get_processing_message(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
         
         # Download thumbnail
@@ -289,7 +335,7 @@ async def handle_thumbnail_watermarking(client: Client, message: Message, user_i
             await message.reply_text(
                 get_error_message("processing_failed"),
                 reply_markup=get_main_menu_keyboard(),
-                parse_mode="markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
             return
         
@@ -300,7 +346,7 @@ async def handle_thumbnail_watermarking(client: Client, message: Message, user_i
             await message.reply_photo(
                 result_file,
                 caption=get_success_message(),
-                parse_mode="markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
         
         # Cleanup
@@ -312,7 +358,7 @@ async def handle_thumbnail_watermarking(client: Client, message: Message, user_i
         await message.reply_text(
             get_error_message("processing_failed"),
             reply_markup=get_main_menu_keyboard(),
-            parse_mode="markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
 
 
